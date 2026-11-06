@@ -1,49 +1,129 @@
 # DrugGeneResearch
 
-**A Python proof-of-concept for literature-augmented drug–gene relationship analysis in cancer research.**
+**A Python proof-of-concept for cancer-specific, literature-augmented drug–gene relationship analysis.**
 
-The program accepts a gene and a drug name, retrieves relevant PubMed article records and abstracts through NCBI E-utilities, and asks a GLM language model to produce an evidence-based summary. It is an educational implementation of the **core workflow**, not a full reproduction or validation of the research paper *Inferring Drug–Gene Relationships in Cancer Using Literature-Augmented Large Language Models*.
+DrugGeneResearch retrieves PubMed publications based on a **gene**, **drug**, and **cancer type**, then uses the Zhipu AI GLM API to generate a literature-grounded summary of possible drug–gene relationships.
+
+The project was developed as an educational implementation of the core workflow described in *Inferring Drug–Gene Relationships in Cancer Using Literature-Augmented Large Language Models*.
+
+**Scope:** This is a proof-of-concept workflow, not a complete reproduction of the original study, a validated prediction system, or a clinical decision-support tool.
 
 ## Features
 
-- Search PubMed using gene and drug terms (`ESearch`).
-- Retrieve titles, PMIDs, and available abstracts (`EFetch`).
-- Analyze retrieved abstracts using the Zhipu AI / GLM API.
-- Report relationship type, possible mechanism, supporting PMIDs, and limitations.
-- Save timestamped literature JSON and analysis text files.
-- Resume analysis from a local JSON file if the model API is temporarily rate-limited.
+- Search PubMed using gene, drug, and cancer-specific terms through NCBI ESearch.
+- Retrieve article titles, PMIDs, and available abstracts through EFetch.
+- Use the Zhipu GLM API to analyze drug–gene relationships within a specified cancer context.
+- Distinguish direct targeting, indirect associations, resistance-related mechanisms, and insufficient evidence.
+- Generate relationship summaries with supporting PMIDs and limitations.
+- Save timestamped literature data and analysis results.
+- Resume analysis from previously saved JSON files without repeating PubMed searches.
+- Handle API errors without overwriting previous analysis reports.
+
+## What's New in V3
+
+Version 3 introduces cancer-specific analysis following feedback from a research supervisor.
+
+### Key Improvements
+
+**1. Cancer-Specific Input**
+
+The program now accepts three input parameters:
+
+- Gene name
+- Drug name
+- Cancer type
+
+**2. Enhanced PubMed Retrieval**
+
+Cancer type is incorporated directly into the PubMed search query. Selected cancer types, including non-small cell lung cancer and breast cancer, support simple MeSH and keyword expansions.
+
+**3. Context-Aware LLM Analysis**
+
+The cancer type is also included in the language model prompt. The model is instructed to analyze relationships within the specified cancer context and avoid transferring conclusions between different cancer types without qualification.
+
+**4. Improved Reliability**
+
+The program preserves literature data when model API calls fail, reports available error information, and supports resuming analysis from local JSON files.
+
+The previous two-input implementation is preserved as `main_v2.py`.
+
+## How It Works
+
+```text
+Gene + Drug + Cancer Type
+           |
+           v
+    PubMed ESearch
+           |
+           v
+    PubMed EFetch
+           |
+           v
+  Retrieve Article Titles,
+     PMIDs and Abstracts
+           |
+           v
+   Save Literature JSON
+           |
+           v
+      Zhipu GLM API
+           |
+           v
+   Relationship Analysis
+           |
+           v
+   Evidence + Mechanism
+   + PMIDs + Limitations
+```
+
+The program currently retrieves up to five matching PubMed records per search. The language model is instructed to use the supplied abstracts as evidence.
+
+All model-generated scientific claims require independent verification against the original publications.
 
 ## Requirements
 
-- Python 3.10 or later (a virtual environment is recommended)
+- Python 3.10 or later
 - Python packages: `requests`, `python-dotenv`, and `zai-sdk`
-- A Zhipu BigModel **standard API key** with access to the configured model
-- Internet access to NCBI E-utilities and the model API
+- A Zhipu BigModel standard API key with access to the configured model
+- Internet access for PubMed retrieval and model API requests
 
 ## Setup
 
-Create and activate a virtual environment (macOS/Linux):
+### 1. Create a Virtual Environment
+
+For macOS or Linux:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
+```
+
+Install the required packages:
+
+```bash
 python -m pip install -r requirements.txt
 ```
 
-Create a local `.env` file in the project directory:
+### 2. Configure the API Key
+
+Create a `.env` file in the project directory. You can use `.env.example` as a template.
 
 ```dotenv
 ZHIPU_API_KEY=your_own_standard_api_key
 ```
 
-The basic PubMed retrieval in `main_v2.py` does not require an NCBI API key. **Never upload `.env` or real API keys to GitHub or include them in a submission.**
+The current PubMed retrieval workflow does not require an NCBI API key.
+
+**Security:** Never upload `.env` or real API keys to GitHub or include them in shared submissions.
 
 ## Usage
 
-Run a new analysis:
+### Run a New Analysis
+
+Execute:
 
 ```bash
-python main_v2.py
+python main_v3.py
 ```
 
 Example input:
@@ -51,49 +131,116 @@ Example input:
 ```text
 Enter gene name: EGFR
 Enter drug name: Osimertinib
+Enter cancer type: Non-Small Cell Lung Cancer
 ```
 
-Check previously saved literature **without making API calls**:
+The program searches PubMed using all three parameters, retrieves relevant article records, saves the literature data, and attempts to generate a cancer-specific analysis using GLM.
+
+### Check Previously Saved Literature
+
+To check a saved V3 JSON file without making any API requests:
 
 ```bash
-python main_v2.py --resume articles_CDK4_Osimertinib.json --check
+python main_v3.py --resume results/your_articles_file.json --check
 ```
 
-Resume model analysis from a saved literature file (calls only the model API):
+Replace `your_articles_file.json` with the actual filename.
+
+### Resume Model Analysis
+
+To continue analysis from previously saved literature without repeating the PubMed search:
 
 ```bash
-python main_v2.py --resume articles_CDK4_Osimertinib.json
+python main_v3.py --resume results/your_articles_file.json
 ```
+
+This command calls the language model API but does not repeat literature retrieval.
+
+**Compatibility:** V3 requires the `cancer_type` field in its input JSON. JSON files generated by the older two-input version cannot be resumed directly in V3.
 
 ## Outputs
 
-- `articles_<gene>_<drug>_<timestamp>.json`: retrieved literature records and abstracts
-- `analysis_<gene>_<drug>_<timestamp>.txt`: model-generated relationship analysis, written **only after a successful model response**
+Generated files are saved in the `results/` directory.
 
-The model may encounter rate limits or account usage limits. A failed model request should not be treated as a completed relationship analysis.
+**Literature Data**
 
-## Preliminary tests
+`articles_<gene>_<drug>_<cancer>_<timestamp>.json`
+
+Contains the input parameters, PubMed search query, retrieval timestamp, PMIDs, article titles, and available abstracts.
+
+**Analysis Report**
+
+`analysis_<gene>_<drug>_<cancer>_<timestamp>.txt`
+
+Contains the model-generated relationship analysis, possible mechanisms, evidence discussion, limitations, and PubMed source links.
+
+Analysis reports are created only after a successful model response.
+
+When the model API is rate-limited, the retrieved literature remains available for later analysis.
+
+## Preliminary Testing
+
+### V2: Drug–Gene Analysis
 
 | Gene | Drug | Outcome |
-| --- | --- | --- |
-| EGFR | Osimertinib | End-to-end analysis ran; the model identified a direct-target relationship. |
-| CDK4 | Palbociclib | End-to-end analysis ran; the model identified CDK4/6 inhibition. |
-| CDK4 | Osimertinib | PubMed retrieval succeeded; model analysis was not completed because the API reached a usage/rate limit. |
+|---|---|---|
+| EGFR | Osimertinib | End-to-end analysis completed; the model identified a direct-target relationship. |
+| CDK4 | Palbociclib | End-to-end analysis completed; the model identified CDK4/6 inhibition. |
+| CDK4 | Osimertinib | PubMed retrieval succeeded; model analysis was not completed because of API rate limits. |
 
-These are **exploratory functional tests**, not a validated accuracy benchmark. The third pair is a *non-direct-target control*, not proof of biological irrelevance.
+### V3: Cancer-Specific Analysis
+
+| Gene | Drug | Cancer Type | Outcome |
+|---|---|---|---|
+| EGFR | Osimertinib | Non-Small Cell Lung Cancer | PubMed retrieval succeeded; five abstracts were obtained. Completed LLM analysis has not yet been verified. |
+| CDK4 | Palbociclib | Breast Cancer | PubMed retrieval succeeded; five abstracts were obtained. The model request returned HTTP 429, business error code 1305. |
+
+V3 has successfully demonstrated cancer-aware literature retrieval for two different cancer contexts.
+
+Full end-to-end validation of the cancer-specific analysis remains ongoing due to model API rate limits.
+
+These are exploratory functional tests, not a systematic benchmark of prediction accuracy or clinical validity.
 
 ## Limitations
 
-- Only a small number of retrieved abstracts (currently up to five) are supplied to the model; selection bias and incomplete coverage are possible.
-- An abstract may not contain enough information to establish a direct molecular mechanism.
-- The model may generate incorrect or overly strong claims. All PMIDs and claim-to-evidence links should be manually verified.
-- The program does not reproduce the full paper's methods, experiments, or performance evaluation.
-- The output is for research/education only, not clinical decision-making.
+- Only a small number of retrieved abstracts, currently up to five, are provided to the language model.
+- Limited literature coverage and relevance-based selection may introduce retrieval bias.
+- The cancer terminology expansion supports only selected cancer types and is not a comprehensive ontology-based search strategy.
+- Co-occurrence of a gene, drug, and cancer type in a publication does not necessarily establish a direct molecular relationship.
+- Abstracts may not contain sufficient information to verify detailed biological mechanisms.
+- Language models may generate unsupported or overly confident scientific claims.
+- Supporting PMIDs and claim-to-evidence relationships require manual verification.
+- Preclinical findings and clinical treatment evidence must be interpreted separately.
+- Model API availability and rate limits may affect the completion of analysis.
+- The complete methodology, quantitative benchmarks, and experimental validation of the original publication have not been reproduced.
 
-## Data and attribution
+**This project is intended for research exploration and educational purposes only. It should not be used for clinical decision-making.**
 
-PubMed records are accessed through NCBI E-utilities. Check the original article licenses before redistributing full abstracts or other copyrighted material. Do not publish private research material without the supervisor's permission.
+## Future Work
 
-### Related publication
+Potential improvements include:
 
-*Inferring Drug–Gene Relationships in Cancer Using Literature-Augmented Large Language Models* — https://pmc.ncbi.nlm.nih.gov/articles/PMC12036822/
+- Expanding cancer terminology and synonym coverage.
+- Improving literature retrieval and relevance ranking.
+- Increasing the number and diversity of analyzed publications.
+- Introducing structured relationship classification.
+- Developing automated evidence-verification methods.
+- Evaluating performance on positive, indirect, and negative-control cases.
+- Comparing different language models and prompting strategies.
+- Building a simple user interface for interactive analysis.
+
+## Data and Attribution
+
+PubMed records are accessed through NCBI E-utilities.
+
+Article-specific licensing should be checked before redistributing full abstracts or copyrighted material.
+
+Locally generated literature datasets and analysis reports are excluded from the public repository.
+
+This project is an independent educational proof of concept inspired by the publication below, not an official implementation.
+
+## Related Publication
+
+*Inferring Drug–Gene Relationships in Cancer Using Literature-Augmented Large Language Models*
+
+https://pmc.ncbi.nlm.nih.gov/articles/PMC12036822/
