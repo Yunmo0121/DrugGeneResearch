@@ -1,0 +1,24 @@
+# API keys and private configuration
+.env
+.env.*
+!.env.example
+
+# Python virtual environment
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# macOS files
+.DS_Store
+
+# Generated research data and reports
+articles*.json
+analysis*.txt
+# Local development archives
+archive/
+
+# Generated experiment results
+results/
